@@ -35,7 +35,7 @@ jobs:
         id: vars
         run: |
           # NE PAS CHANGER : Votre nom d'utilisateur Docker Hub est naimaelmaa
-          DOCKER_REPO="naimaelmaa/pitstop-workshop"
+          DOCKER_REPO="naimaelmaa/pitstop-workshop-planning"
           TAG_SHA="${{ github.sha }}"
           
           echo "DOCKER_REPO=$DOCKER_REPO" >> $GITHUB_OUTPUT
@@ -46,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           # Le chemin vers le Dockerfile de ce microservice
-          context: ./pitstop-workshop
+          context: ./pitstop-workshop-planning
           push: true
           tags: ${{ steps.vars.outputs.TAGS }}
           # Maintient le cache GHA que vous vouliez utiliser
