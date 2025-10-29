@@ -46,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           # Le chemin vers le Dockerfile de ce microservice
-          context: ./pitstop-gateway 
+          context: ./pitstop-express-gateway
           push: true
           tags: ${{ steps.vars.outputs.TAGS }}
           # Maintient le cache GHA que vous vouliez utiliser
