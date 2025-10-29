@@ -1,11 +1,9 @@
 name: CI Customer Service - Build & Push Docker
 
-# Déclenche le pipeline uniquement sur les changements dans le dossier du service
 on:
   push:
     branches:
-      - main # Assurez-vous que c'est la bonne branche (main ou master)
-    # Le pipeline s'exécute uniquement si quelque chose a changé dans ce dossier
+      - main # Assurez-vous que c'est la bonne branche
     paths:
       - 'pitstop-customer/**'
 
@@ -16,27 +14,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Login à Docker Hub
+      # NOUVELLE ÉTAPE 1 : Configuration de QEMU (nécessaire pour la compatibilité)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # NOUVELLE ÉTAPE 2 : Configuration du Builder (Buildx)
+      # Ceci est la correction. Nous passons au pilote 'docker-container' pour activer le cache GHA.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Login à Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PAT }}
           
-      # 2. Définir les variables pour le nom et le tag de l'image
+      # 4. Définir les variables pour le nom et le tag de l'image
       - name: Set up Image Variables and Metadata
         id: vars
         run: |
-          # LE NOM D'UTILISATEUR DOCKER HUB EST MAINTENANT CORRECT
+          # NE PAS CHANGER : Votre nom d'utilisateur Docker Hub est naimaelmaa
           DOCKER_REPO="naimaelmaa/pitstop-customer"
-          
-          # Utilise le SHA court du commit comme tag unique, et 'latest'
           TAG_SHA="${{ github.sha }}"
           
           echo "DOCKER_REPO=$DOCKER_REPO" >> $GITHUB_OUTPUT
           echo "TAGS=$DOCKER_REPO:$TAG_SHA,$DOCKER_REPO:latest" >> $GITHUB_OUTPUT
 
-      # 3. Build de l'image Docker et push vers Docker Hub
+      # 5. Build de l'image Docker et push vers Docker Hub
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -44,5 +49,6 @@ jobs:
           context: ./pitstop-customer 
           push: true
           tags: ${{ steps.vars.outputs.TAGS }}
-          cache-from: type=gha # Active le cache pour accélérer les builds futurs
+          # Maintient le cache GHA que vous vouliez utiliser
+          cache-from: type=gha 
           cache-to: type=gha,mode=max
