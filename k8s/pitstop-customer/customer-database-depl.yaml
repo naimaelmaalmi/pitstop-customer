@@ -1,18 +1,23 @@
+# ConfigMap pour la base de données Customer
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pitstop-customer-database-configmap
+  namespace: pitstop
 data:
   MYSQL_DATABASE: pitstop
   MYSQL_ROOT_PASSWORD: pitstop-user
   MYSQL_USER: pitstop-user
   MYSQL_PASSWORD: pitstop-user
   DATABASE_HOST: pitstop-customer-database-service
+
 ---
+# PersistentVolume pour stocker les données MySQL
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: customer-db-volume
+  namespace: pitstop
   labels:
     type: local
 spec:
@@ -22,12 +27,15 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/mnt/data"
+    path: "/mnt/data/customer"
+
 ---
+# PersistentVolumeClaim pour la base de données Customer
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: customer-db-pv-claim
+  namespace: pitstop
 spec:
   storageClassName: "standard"
   accessModes:
@@ -35,24 +43,30 @@ spec:
   resources:
     requests:
       storage: 1Gi
+
 ---
+# Service pour exposer la base de données Customer dans le cluster
 apiVersion: v1
 kind: Service
 metadata:
   name: pitstop-customer-database-service
+  namespace: pitstop
 spec:
   ports:
-   - name: mysql
-     port: 3307
-     targetPort: 3306
+    - name: mysql
+      port: 3306       # Port interne exposé dans le cluster
+      targetPort: 3306 # Port du container MySQL
   selector:
     app: pitstop-customer-database
   type: ClusterIP
+
 ---
+# Deployment de la base de données Customer
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pitstop-customer-database
+  namespace: pitstop
 spec:
   selector:
     matchLabels:
@@ -65,18 +79,18 @@ spec:
         app: pitstop-customer-database
     spec:
       containers:
-      - image: mysql:5.6
-        name: mysql
-        envFrom:
+        - name: mysql
+          image: mysql:5.6
+          envFrom:
             - configMapRef:
                 name: pitstop-customer-database-configmap
-        ports:
-        - containerPort: 3306
-          name: mysql
-        volumeMounts:
-        - name: customerdb-persistent-storage
-          mountPath: /var/lib/mysql
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: customerdb-storage
+              mountPath: /var/lib/mysql
       volumes:
-      - name: customerdb-persistent-storage
-        persistentVolumeClaim:
-          claimName: customer-db-pv-claim
+        - name: customerdb-storage
+          persistentVolumeClaim:
+            claimName: customer-db-pv-claim

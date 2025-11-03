@@ -2,26 +2,28 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pitstop-vehicle-configmap
+  namespace: pitstop
 data:
-    DB_USER: pitstop-user
-    DB_PASSWORD: pitstop-user
-    DB_NAME: pitstop
-    DB_HOST: pitstop-vehicle-database-service
-    DB_PORT: "3308"
-    SERVICE_NAME: pitstop-vehicle
-    PORT: "3002"
-    MESSAGE_BUS: pitstop-rabbitmq-service
-    MESSAGE_BUS_USERNAME: pitstop
-    MESSAGE_BUS_PASSWORD: pitstop
-    MESSAGE_BUS_TIMEOUT: "500"
+  DB_USER: pitstop-user
+  DB_PASSWORD: pitstop-user
+  DB_NAME: pitstop
+  DB_HOST: pitstop-vehicle-database-service
+  DB_PORT: "3306"        # correspond au port exposé par ton service MySQL Vehicle
+  SERVICE_NAME: pitstop-vehicle
+  PORT: "3000"            # harmonisé avec ton application (3002 était arbitraire)
+  MESSAGE_BUS: pitstop-rabbitmq-service
+  MESSAGE_BUS_USERNAME: pitstop
+  MESSAGE_BUS_PASSWORD: pitstop
+  MESSAGE_BUS_TIMEOUT: "500"
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pitstop-vehicle-depl
+  namespace: pitstop
 spec:
-  replicas: 3
+  replicas: 1                # commence avec 1 pour faciliter le debug
   selector:
     matchLabels:
       app: pitstop-vehicle
@@ -34,18 +36,21 @@ spec:
         - name: pitstop-vehicle
           image: msalekmouad/pitstop-vehicle:dev
           ports:
-            - containerPort: 3002
+            - containerPort: 3000
           envFrom:
             - configMapRef:
                 name: pitstop-vehicle-configmap
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: pitstop-vehicle-service
+  namespace: pitstop
 spec:
   ports:
-    - port: 3002
+    - port: 3000
+      targetPort: 3000
   type: ClusterIP
   selector:
     app: pitstop-vehicle

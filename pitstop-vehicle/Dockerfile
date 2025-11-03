@@ -1,7 +1,21 @@
-FROM node:10
-WORKDIR /app/vehicle
-COPY package.json ./
-RUN npm install
-COPY . .
-CMD ["npm","start"]
+#ÉTAPE 1: BUILD STAGE
 
+#----------------------------------------------------------------------
+
+FROM node:18-alpine AS builder
+WORKDIR /app/vehicle
+COPY package.json package-lock.json ./
+RUN npm install --production
+COPY . .
+
+#----------------------------------------------------------------------
+
+#ÉTAPE 2: PRODUCTION STAGE
+
+#----------------------------------------------------------------------
+
+FROM node:18-alpine
+WORKDIR /app/vehicle
+COPY --from=builder /app/vehicle ./
+EXPOSE 3002
+CMD ["npm", "start"]

@@ -1,19 +1,18 @@
+# Manifeste Kubernetes pour le service pitstop-customer.
+# OBJECTIF DEVOPS: Supprimer les secrets non sécurisés d'une ConfigMap.
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pitstop-customer-configmap
 data:
-    DB_USER: pitstop-user
-    DB_PASSWORD: pitstop-user
-    DB_NAME: pitstop
-    DB_HOST: pitstop-customer-database-service
-    DB_PORT: "3307"
-    SERVICE_NAME: pitstop-customer
-    PORT: "3001"
-    MESSAGE_BUS: pitstop-rabbitmq-service
-    MESSAGE_BUS_USERNAME: pitstop
-    MESSAGE_BUS_PASSWORD: pitstop
-    MESSAGE_BUS_TIMEOUT: "500"
+  # Reste des configurations NON sensibles. Les mots de passe sont SUPPRIMÉS.
+  DB_HOST: pitstop-customer-database-service
+  DB_PORT: "3306"
+  SERVICE_NAME: pitstop-customer
+  PORT: "3001"
+  MESSAGE_BUS: pitstop-rabbitmq-service
+  MESSAGE_BUS_TIMEOUT: "500"
 
 ---
 apiVersion: apps/v1
@@ -29,15 +28,52 @@ spec:
     metadata:
       labels:
         app: pitstop-customer
+      # C'EST ICI QU'ON AJOUTE LES ANNOTATIONS VAULT DANS UNE VRAIE INTÉGRATION DEVOPS
+      # Ces lignes seraient insérées pour que Vault injecte les secrets
+      # annotations:
+      #   "vault.hashicorp.com/agent-inject": "true"
+      #   "vault.hashicorp.com/role": "pitstop-app"
+      #   ... (autres annotations pour l'injection)
     spec:
       containers:
         - name: pitstop-customer
-          image: msalekmouad/pitstop-customer:dev
+          # L'image doit utiliser le tag local si non publiée: pitstop-customer:latest
+          image: pitstop-customer:latest 
           ports:
             - containerPort: 3001
-          envFrom:
-            - configMapRef:
-                name: pitstop-customer-configmap
+          # On remplace l'ancien envFrom (ConfigMap) pour n'utiliser QUE les variables non sensibles
+          # et on ajoute les secrets via Vault (prochaine étape)
+          env:
+            # 1. Variables de la ConfigMap (NON sensibles)
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: pitstop-customer-configmap
+                  key: DB_NAME
+            # 2. Variables SÉCURISÉES (Secrets BDD/RabbitMQ)
+            # Dans un vrai projet, ces valeurs pointeraient vers un Secret/Vault
+            # Ici, on utilise des Secrets pour prouver le concept, car la ConfigMap était en clair.
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pitstop-mysql-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pitstop-mysql-secret
+                  key: password
+            - name: MESSAGE_BUS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pitstop-rabbitmq-secret
+                  key: user
+            - name: MESSAGE_BUS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pitstop-rabbitmq-secret
+                  key: password
+
 ---
 apiVersion: v1
 kind: Service
@@ -46,6 +82,6 @@ metadata:
 spec:
   ports:
     - port: 3001
-  type: NodePort
+  type: ClusterIP # Changement de NodePort à ClusterIP pour plus de sécurité interne
   selector:
     app: pitstop-customer

@@ -14,12 +14,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # NOUVELLE ÉTAPE 1 : Configuration de QEMU (nécessaire pour la compatibilité)
+      # ÉTAPE 1 : Configuration de QEMU (nécessaire pour la compatibilité)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # NOUVELLE ÉTAPE 2 : Configuration du Builder (Buildx)
-      # Ceci est la correction. Nous passons au pilote 'docker-container' pour activer le cache GHA.
+      # ÉTAPE 2 : Configuration du Builder (Buildx)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -34,13 +33,15 @@ jobs:
       - name: Set up Image Variables and Metadata
         id: vars
         run: |
-          # NE PAS CHANGER : Votre nom d'utilisateur Docker Hub est naimaelmaa
+          # Votre nom d'utilisateur Docker Hub est naimaelmaa
           DOCKER_REPO="naimaelmaa/pitstop-customer"
           TAG_SHA="${{ github.sha }}"
           
           echo "DOCKER_REPO=$DOCKER_REPO" >> $GITHUB_OUTPUT
           echo "TAGS=$DOCKER_REPO:$TAG_SHA,$DOCKER_REPO:latest" >> $GITHUB_OUTPUT
-
+          echo "IMAGE_NAME=$DOCKER_REPO:$TAG_SHA" >> $GITHUB_OUTPUT
+          echo "K8S_MANIFEST_PATH=k8s/pitstop-customer/pitstop-customer-depl.yaml" >> $GITHUB_OUTPUT # Chemin du manifeste
+          
       # 5. Build de l'image Docker et push vers Docker Hub
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
@@ -49,6 +50,39 @@ jobs:
           context: ./pitstop-customer 
           push: true
           tags: ${{ steps.vars.outputs.TAGS }}
-          # Maintient le cache GHA que vous vouliez utiliser
+          # Maintient le cache GHA
           cache-from: type=gha 
           cache-to: type=gha,mode=max
+
+      # ==============================================================
+      # ÉTAPE 6: SCAN DE SÉCURITÉ (DevSecOps)
+      # Bloque le pipeline si des vulnérabilités critiques sont trouvées
+      # ==============================================================
+      - name: Scan Docker Image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.vars.outputs.IMAGE_NAME }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH' # Fait échouer si CRITICAL ou HIGH est détecté
+          
+      # ==============================================================
+      # ÉTAPE 7: DÉPLOIEMENT GITOPS (Mise à jour du manifeste)
+      # Exécuté UNIQUEMENT si le scan de sécurité a réussi
+      # ==============================================================
+      - name: Update K8s Manifest for GitOps
+        # N'exécute cette étape que si la branche est main
+        if: github.ref == 'refs/heads/main'
+        uses: mikefarah/yq@master
+        with:
+          # Utilise yq pour injecter le nouveau tag d'image dans le manifeste K8s
+          cmd: |
+            yq e '.spec.template.spec.containers[0].image = "${{ steps.vars.outputs.IMAGE_NAME }}"' -i ${{ steps.vars.outputs.K8S_MANIFEST_PATH }}
+
+      - name: Commit Updated K8s Manifest
+        # L'étape finale GitOps: commite la modification d'image
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "GitOps: Update pitstop-customer image to ${{ steps.vars.outputs.TAG_SHA }}"
+          file_pattern: ${{ steps.vars.outputs.K8S_MANIFEST_PATH }}
+          branch: main

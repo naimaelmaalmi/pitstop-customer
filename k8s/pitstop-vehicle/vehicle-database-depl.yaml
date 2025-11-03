@@ -7,7 +7,6 @@ data:
   MYSQL_ROOT_PASSWORD: pitstop-user
   MYSQL_USER: pitstop-user
   MYSQL_PASSWORD: pitstop-user
----
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -22,7 +21,6 @@ spec:
     - ReadWriteOnce
   hostPath:
     path: "/mnt/data"
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -34,7 +32,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,7 +44,6 @@ spec:
   selector:
     app: pitstop-vehicle-database
   type: ClusterIP
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

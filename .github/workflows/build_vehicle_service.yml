@@ -14,12 +14,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # NOUVELLE ÉTAPE 1 : Configuration de QEMU (nécessaire pour la compatibilité)
+      # 1. Configuration de QEMU
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # NOUVELLE ÉTAPE 2 : Configuration du Builder (Buildx)
-      # Ceci est la correction. Nous passons au pilote 'docker-container' pour activer le cache GHA.
+      # 2. Configuration du Builder (Buildx)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -45,10 +44,40 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
-          # Le chemin vers le Dockerfile de ce microservice
           context: ./pitstop-vehicle 
           push: true
           tags: ${{ steps.vars.outputs.TAGS }}
-          # Maintient le cache GHA que vous vouliez utiliser
           cache-from: type=gha 
           cache-to: type=gha,mode=max
+
+      # 6. SCAN DE SÉCURITÉ (DevSecOps) - Utilisation de Trivy
+      - name: Scan Docker Image for Vulnerabilities (Trivy)
+        uses: aquasec/trivy-action@master
+        with:
+          image-ref: ${{ steps.vars.outputs.DOCKER_REPO }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1' # Échoue si des vulnérabilités CRITIQUES ou HAUTES sont détectées
+          severity: 'CRITICAL,HIGH'
+          output: 'trivy-results.sarif'
+
+      # 7. DÉPLOIEMENT GITOPS - Mise à jour du manifeste Kubernetes
+      - name: Update K8s Manifest for GitOps (Deployment)
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+          context: default
+
+      - name: Patch K8s Deployment with new Image Tag
+        run: |
+          K8S_MANIFEST_PATH="k8s/pitstop-vehicle/pitstop-vehicle-depl.yaml"
+          NEW_IMAGE_TAG="${{ steps.vars.outputs.TAGS }}"
+          DEPLOYMENT_NAME="pitstop-vehicle-depl"
+          
+          # Mise à jour de l'image dans le manifeste
+          sed -i 's|image: .*|image: '$NEW_IMAGE_TAG'|g' $K8S_MANIFEST_PATH
+
+      - name: Commit Updated Manifest
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'GitOps: Update vehicle image to ${{ github.sha }}'
+          file_pattern: 'k8s/pitstop-vehicle/pitstop-vehicle-depl.yaml'
