@@ -27,7 +27,7 @@ export default {
   props: ["customer"],
   data: () => ({
     deleteConfirmation: false,
-  }),
+  }), 
   computed: {
     ...mapGetters(["getLoadingCustomers"]),
   },
