@@ -52,7 +52,7 @@ jobs:
 
       # 6. vvSCAN DE SÉCURITÉ (DevSecOps)o - Utilisation de Trivy
       - name: Scan Docker Image for Vulnerabilities (Trivy)
-        uses: aquasec/trivy-action@0.1.6
+        uses: aquasec/trivy-action@0
         with:
           image-ref: ${{ steps.vars.outputs.DOCKER_REPO }}:${{ github.sha }}
           format: 'table'

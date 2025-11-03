@@ -13,7 +13,7 @@
         </v-flex>
         <v-flex class="mt-4">
           <p
-            class="
+            class="  
               text-center
               white--text
               text-h5
